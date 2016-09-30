@@ -38,6 +38,7 @@ const (
 const (
 	ProcConnectOpen              = 1
 	ProcConnectClose             = 2
+	ProcConnectGetCapabilties    = 7
 	ProcDomainLookupByName       = 23
 	ProcAuthList                 = 66
 	ProcConnectGetLibVersion     = 157
