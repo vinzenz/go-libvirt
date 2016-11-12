@@ -28,11 +28,43 @@ import (
 
 	"github.com/davecgh/go-xdr/xdr2"
 	"github.com/digitalocean/go-libvirt/internal/constants"
+	"github.com/digitalocean/go-libvirt/sasl"
 )
 
 // ErrEventsNotSupported is returned by Events() if event streams
 // are unsupported by either QEMU or libvirt.
 var ErrEventsNotSupported = errors.New("event monitor is not supported")
+
+// AuthInfo is used as authentication provider
+type AuthInfo interface {
+	WantedAuthType() constants.RemoteAuthType
+}
+
+type authInfoProvider struct {
+	wantedAuthType constants.RemoteAuthType
+}
+
+func (auth authInfoProvider) WantedAuthType() constants.RemoteAuthType {
+	return auth.wantedAuthType
+}
+
+type saslAuthInfo struct {
+	authInfoProvider
+	saslAuthInfo sasl.AuthInfo
+}
+
+func (auth saslAuthInfo) Callback(items []sasl.CallbackRequestItem) error {
+	return auth.saslAuthInfo.Callback(items)
+}
+
+// SASLUserPassAuth creates an AuthInfo object for SASL with embedded
+// username and password provider
+func SASLUserPassAuth(username, password string) AuthInfo {
+	return &saslAuthInfo{
+		authInfoProvider{constants.RemoteAuthTypeSASL},
+		sasl.MakeUserPassAuthInfo(username, password),
+	}
+}
 
 // Libvirt implements LibVirt's remote procedure call protocol.
 type Libvirt struct {
@@ -156,7 +188,15 @@ const (
 // Connect establishes communication with the libvirt server.
 // The underlying libvirt socket connection must be previously established.
 func (l *Libvirt) Connect() error {
-	return l.connect()
+	return l.connect(nil)
+}
+
+// ConnectWithAuth establishes communication with the libvirt server and takes
+// an argument authInfo for providing authentication information in case it is
+// required to authenticate against the libvirt daemon.
+// The underlying libvirt socket connection must be previously established.
+func (l *Libvirt) ConnectWithAuth(authInfo AuthInfo) error {
+	return l.connect(authInfo)
 }
 
 // Disconnect shuts down communication with the libvirt server
